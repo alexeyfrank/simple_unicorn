@@ -4,6 +4,8 @@ require 'rack'
 require 'simple_unicorn'
 require 'kgio'
 
+Encoding.default_external = Encoding::ASCII_8BIT
+
 app = SimpleUnicorn.builder(ARGV[0] || 'config.ru')
 
 
@@ -55,11 +57,13 @@ ensure
   body.respond_to?(:close) and body.close
 end
 
+puts 'Ready'
 
 loop do
+
   if client = server.kgio_tryaccept
-    status, headers, body = request.read(client)
-    status, headers, body = app.call status, headers, body
+    env = request.read(client)
+    status, headers, body = app.call env
     http_response_write(client, status, headers, body)
     unless client.closed? # rack.hijack may've close this for us
       client.shutdown # in case of fork() in Rack app
