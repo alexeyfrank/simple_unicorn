@@ -8,8 +8,8 @@ Gem::Specification.new do |gem|
   gem.version       = SimpleUnicorn::VERSION
   gem.authors       = ["Alexey Frank"]
   gem.email         = ["alexeyfrank@gmail.com"]
-  gem.description   = %q{TODO: Write a gem description}
-  gem.summary       = %q{TODO: Write a gem summary}
+  gem.description   = %q{TO2DO: Write a gem description}
+  gem.summary       = %q{TO2DO: Write a gem summary}
   gem.homepage      = ""
 
   gem.files         = `git ls-files`.split($/)

@@ -1,0 +1,69 @@
+#!/usr/bin/env ruby
+
+require 'rack'
+require 'simple_unicorn'
+require 'kgio'
+
+app = SimpleUnicorn.builder(ARGV[0] || 'config.ru')
+
+
+#bind listener
+server = Kgio::TCPServer.new('0.0.0.0', 9000)
+
+request = SimpleUnicorn::Request.new
+
+#CLRF = "\r\n"
+
+def http_response_write(socket, status, headers, body)
+  status = status
+
+  http_response_start = 'HTTP/1.1 '
+  if headers
+    buf = "#{http_response_start}#{status}\r\n" \
+            "Date: #{Time.now}\r\n" \
+            "Status: #{status}\r\n" \
+            "Connection: close\r\n"
+    headers.each do |key, value|
+      case key
+        when %r{\A(?:Date\z|Connection\z)}i
+          next
+        when "rack.hijack"
+          # this was an illegal key in Rack < 1.5, so it should be
+          # OK to silently discard it for those older versions
+          #hijack = hijack_prepare(value)
+        else
+          if value =~ /\n/
+            # avoiding blank, key-only cookies with /\n+/
+            buf << value.split(/\n+/).map! { |v| "#{key}: #{v}\r\n" }.join
+          else
+            buf << "#{key}: #{value}\r\n"
+          end
+      end
+    end
+    socket.write(buf << "\r\n")
+  end
+
+  if body.respond_to? :each
+    body.each { |chunk| socket.write(chunk) }
+  else
+
+    p("Write to socket")
+    socket.write body
+  end
+
+ensure
+  body.respond_to?(:close) and body.close
+end
+
+
+loop do
+  if client = server.kgio_tryaccept
+    status, headers, body = request.read(client)
+    status, headers, body = app.call status, headers, body
+    http_response_write(client, status, headers, body)
+    unless client.closed? # rack.hijack may've close this for us
+      client.shutdown # in case of fork() in Rack app
+      client.close # flush and uncork socket immediately, no keepalive
+    end
+  end
+end
